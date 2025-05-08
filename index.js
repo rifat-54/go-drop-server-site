@@ -2,9 +2,26 @@ require ('dotenv').config()
 const express=require ('express')
 const cors=require ('cors')
 const { MongoClient, ServerApiVersion } = require('mongodb');
+const jwt=require ('jsonwebtoken')
+const cookieParser=require('cookie-parser')
+
+
+
+const corsOptions={
+  origin:['http://localhost:5173',
+  'https://group-study-be847.web.app'
+],
+  credentials:true,
+  optionalSuccessStatus:200
+}
+
+
+
 const app=express()
 app.use(cors())
 app.use(express.json())
+app.use(cookieParser)
+app.use(cors(corsOptions))
 
 const port=process.env.PORT || 5000
 
@@ -79,7 +96,7 @@ async function run() {
     }
 
 
-    
+
 
 
 
