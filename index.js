@@ -35,6 +35,54 @@ async function run() {
 
 
 
+
+      //   jwt token
+
+      app.post('/jwt',async(req,res)=>{
+        const email=req.body;
+        
+        const token=jwt.sign(email,process.env.TOKEN_SECRET_KEY,{expiresIn:'1d'})
+        res.cookie('token',token,{
+            httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+        })
+        .send({success:true})
+    })
+
+    // remove token
+
+    app.get('/logout',async(req,res)=>{
+        res.clearCookie('token',{
+            maxAge:0,
+            secure: process.env.NODE_ENV === "production",
+            sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+        })
+        .send({success:true})
+    })
+
+    // verify token
+
+    const verifyToken=(req,res,next)=>{
+        const token=req.cookies.token;
+        if(!token){
+           return res.status(401).send({message:'unauthorized access'})
+        }
+        jwt.verify(token,process.env.TOKEN_SECRET_KEY,(err,decoded)=>{
+            if(err){
+                return res.status(401).send({message:'unauthorized access'})
+            }
+            req.user=decoded;
+            next()
+        })
+
+    }
+
+
+    
+
+
+
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
