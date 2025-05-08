@@ -9,19 +9,19 @@ const cookieParser=require('cookie-parser')
 
 const corsOptions={
   origin:['http://localhost:5173',
-  'https://group-study-be847.web.app'
+  
 ],
   credentials:true,
-  optionalSuccessStatus:200
+  optionsSuccessStatus: 200
 }
 
 
 
 const app=express()
-app.use(cors())
 app.use(express.json())
-app.use(cookieParser)
-app.use(cors(corsOptions))
+// app.use(cors())   //comment this for stop Access-Control-Allow-Origin from any here
+app.use(cookieParser())
+app.use(cors(corsOptions))    //only allow withcreadential .
 
 const port=process.env.PORT || 5000
 
@@ -57,6 +57,8 @@ async function run() {
 
       app.post('/jwt',async(req,res)=>{
         const email=req.body;
+
+        // console.log('email-> ',email);
         
         const token=jwt.sign(email,process.env.TOKEN_SECRET_KEY,{expiresIn:'1d'})
         res.cookie('token',token,{
@@ -70,6 +72,7 @@ async function run() {
     // remove token
 
     app.get('/logout',async(req,res)=>{
+      
         res.clearCookie('token',{
             maxAge:0,
             secure: process.env.NODE_ENV === "production",
@@ -106,7 +109,7 @@ async function run() {
 
   } finally {
     // Ensures that the client will close when you finish/error
-    await client.close();
+    // await client.close();
   }
 }
 
