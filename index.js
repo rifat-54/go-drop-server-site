@@ -45,7 +45,7 @@ async function run() {
     // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
 
-    const db=client.db('Go Drop')
+    const db=client.db('GoDrop')
 
     const userCollections=db.collection('users')
 
@@ -97,6 +97,30 @@ async function run() {
         })
 
     }
+
+
+
+    // save user to database
+
+    app.post('/users',async(req,res)=>{
+      const data=req.body;
+      console.log(data);
+      const email=data?.email;
+      
+      const query={email:email}
+
+
+
+      const isExit=await userCollections.findOne(query)
+      if(isExit){
+        return res.send({message:'user already exit',insertedId:null})
+      }
+
+      const result=await userCollections.insertOne(data);
+
+      res.send (result)
+
+    })
 
 
 
