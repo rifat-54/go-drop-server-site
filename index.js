@@ -48,6 +48,7 @@ async function run() {
     const db=client.db('GoDrop')
 
     const userCollections=db.collection('users')
+    const bookParcelCollections=db.collection('book-parcel')
 
 
 
@@ -104,12 +105,8 @@ async function run() {
 
     app.post('/users',async(req,res)=>{
       const data=req.body;
-      console.log(data);
       const email=data?.email;
-      
       const query={email:email}
-
-
 
       const isExit=await userCollections.findOne(query)
       if(isExit){
@@ -121,6 +118,36 @@ async function run() {
       res.send (result)
 
     })
+
+
+    // get user role
+
+    app.get('/user/role/:email',async(req,res)=>{
+      const email=req.params.email;
+     
+      const query={email}
+      const isExit=await userCollections.findOne(query)
+      if(!isExit){
+        return res.status(401).send('forbidden access')
+      }
+      const role=isExit?.role;
+      res.send(role)
+    })
+
+    // save book parcel to database
+
+    app.post('/book-parcel',async(req,res)=>{
+      const data=req.body;
+      data.status='Pending',
+      console.log(data);
+
+      const result =await bookParcelCollections.insertOne(data);
+      res.send(result);
+
+    })
+
+
+
 
 
 
