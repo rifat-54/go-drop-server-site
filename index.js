@@ -1,7 +1,7 @@
 require ('dotenv').config()
 const express=require ('express')
 const cors=require ('cors')
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const jwt=require ('jsonwebtoken')
 const cookieParser=require('cookie-parser')
 
@@ -107,6 +107,7 @@ async function run() {
       const data=req.body;
       const email=data?.email;
       const query={email:email}
+      data.userStatus='Not_Verify'
 
       const isExit=await userCollections.findOne(query)
       if(isExit){
@@ -122,7 +123,7 @@ async function run() {
 
     // get user role
 
-    app.get('/user/role/:email',async(req,res)=>{
+    app.get('/user/role/:email',verifyToken,async(req,res)=>{
       const email=req.params.email;
      
       const query={email}
@@ -138,8 +139,9 @@ async function run() {
 
     app.post('/book-parcel',async(req,res)=>{
       const data=req.body;
-      data.status='Pending',
-      console.log(data);
+      data.status='Pending'
+
+    
 
       const result =await bookParcelCollections.insertOne(data);
       res.send(result);
@@ -148,6 +150,145 @@ async function run() {
 
 
 
+    // get all users data           // Admin verify
+
+    app.get('/allusers',verifyToken,async(req,res)=>{
+
+      const result=await userCollections.aggregate([
+        {
+          $lookup:{
+            from:'book-parcel',
+            localField:'email',
+            foreignField:'email',
+            as:'parcel'
+          }
+        },
+        {
+          $project:{
+            name:1,
+            email:1,
+            role:1,
+            totalBooked:{$size:"$parcel"},
+            toalCost:{$sum:"$parcel.price"},
+            phone:{
+              $arrayElemAt:[
+                '$parcel.phone',
+                {$subtract:[{$size:'$parcel.phone'},1]}
+              ]
+            }
+          }
+        }
+
+      ]).toArray()
+
+      
+      res.send(result)
+    })
+
+
+    // get all parcel data             // verify admin routes
+
+    app.get('/all-parcel',verifyToken,async(req,res)=>{
+      const result =await bookParcelCollections.find().toArray()
+      res.send(result);
+    })
+
+
+    // apply for delivery man to verify status
+
+    app.post('/apply-deliveryman-status',verifyToken,async(req,res)=>{
+      const data=req.body;
+      const email=data?.email;
+
+      const query={email}
+      const updateDoc={
+        $set:{
+          userStatus:'Pending',
+          phone:data?.phone,
+          address:data.userAddress,
+          age:data.age
+        }
+      }
+
+      const result=await userCollections.updateOne(query,updateDoc)
+
+      res.send(result)
+      
+    })
+
+
+    // get all delivery man 
+
+    app.get('/all-deliveryman',verifyToken,async(req,res)=>{
+      const query={
+        role:'Delivery Man'
+      }
+
+      const result=await userCollections.find(query).toArray()
+      res.send(result)
+    })
+
+
+    // /update-deliveryman-status           //TO DO verify admin
+
+    app.patch('/update-deliveryman-status/:id',verifyToken,async(req,res)=>{
+      const id=req.params.id;
+
+      const query={_id:new ObjectId(id)}
+      const updateDoc={
+        $set:{
+          userStatus:'Verified'
+        }
+      }
+
+      const result=await userCollections.updateOne(query,updateDoc)
+      res.send(result)
+
+    })
+
+
+    // get all-verified-deleveryman     //TO DO verify admin
+
+    app.get('/all-verified-deliveryman',verifyToken,async(req,res)=>{
+      const query={
+        role:'Delivery Man',
+        userStatus:'Verified'
+      }
+      const result=await userCollections.find(query).toArray()
+      res.send(result);
+
+    })
+
+
+    //assign-parcel-deliveryman     // to do verify admin
+
+    app.patch('/assign-parcel-deliveryman/:id',verifyToken,async(req,res)=>{
+      const id=req.params.id;
+      const deliveryMan=req.body;
+      // console.log(id,deliveryMan);
+      const query={_id:new ObjectId(id)}
+
+      const updateDoc={
+        $set:{status:'On The Way',
+          deliveryMan
+        }
+      }
+      const result=await bookParcelCollections.updateOne(query,updateDoc)
+      res.send(result)
+      
+    })
+
+
+
+    // get my delivery list     // to do devivery man 
+
+    app.get('/my-delivery-list/:email',verifyToken,async(req,res)=>{
+      const email=req.params.email;
+      const query={'deliveryMan.DeliveryManEmail':email}
+
+      const result=await bookParcelCollections.find(query).toArray()
+      res.send(result)
+    })
 
 
 
