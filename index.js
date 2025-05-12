@@ -288,8 +288,42 @@ async function run() {
 
       const result=await bookParcelCollections.find(query).toArray()
       res.send(result)
+
     })
 
+    app.patch('/update-booking-status/:id',verifyToken,async(req,res)=>{
+      const id=req.params.id;
+      const data=req.body;
+    
+      const query={_id:new ObjectId(id)}
+      const updateDoc={
+        $set:{
+          status:data?.newStatus
+        }
+      }
+
+      const result =await bookParcelCollections.updateOne(query,updateDoc)
+      res.send(result)
+    })
+
+
+    // update user role             // verify admin routes
+
+    app.patch('/update-user-role/:id',verifyToken,async(req,res)=>{
+      const id=req.params.id;
+      const data=req.body;
+
+      const query={_id:new ObjectId(id)}
+      const updateDoc={
+        $set:{
+          role:data?.updateRole
+        }
+      }
+      const result=await userCollections.updateOne(query,updateDoc)
+      res.send(result)
+      
+    })
+ 
 
 
 
