@@ -4,7 +4,7 @@ const cors=require ('cors')
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const jwt=require ('jsonwebtoken')
 const cookieParser=require('cookie-parser')
-
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 
 const corsOptions={
@@ -51,6 +51,7 @@ async function run() {
     const userCollections=db.collection('users')
     const bookParcelCollections=db.collection('book-parcel')
     const revewCollections=db.collection('revews')
+    const paymentCollections=db.collection('payments')
 
 
 
@@ -267,7 +268,7 @@ async function run() {
     app.patch('/assign-parcel-deliveryman/:id',verifyToken,async(req,res)=>{
       const id=req.params.id;
       const deliveryMan=req.body;
-      // console.log(id,deliveryMan);
+     
       const query={_id:new ObjectId(id)}
 
       const updateDoc={
@@ -332,7 +333,7 @@ async function run() {
       const query={email}
       const result=await userCollections.findOne(query)
       res.send(result)
-      console.log(result);
+     
     })
  
 
@@ -371,12 +372,12 @@ async function run() {
 
       const id=isExit?._id.toString();
 
-      console.log(email,id);
+      
 
       const query2={deliverManId:id}
 
       const result =await revewCollections.find(query2).toArray()
-      console.log('result->>',result);
+     
       res.send(result)
 
     })
@@ -408,7 +409,7 @@ async function run() {
       const query={_id:new ObjectId(id)}
       const result=await bookParcelCollections.findOne(query)
       res.send(result)
-      console.log(result);
+      
     })
 
 
@@ -422,10 +423,10 @@ async function run() {
         $set:data
       };
       const result =await bookParcelCollections.updateOne(query,updateDoc)
-      console.log(result);
+      // console.log(result);
       res.send(result)
       
-      console.log(id,updateDoc);
+      // console.log(id,updateDoc);
     })
 
 
@@ -491,7 +492,7 @@ async function run() {
       ]).toArray()
 
 
-      console.log(bookedVsDeliver);
+      // console.log(bookedVsDeliver);
 
       const result={
         bookVsDate,
@@ -518,8 +519,100 @@ async function run() {
 
       res.send(result);
 
-      console.log(result);
+      // console.log(result);
     })
+
+
+    // mycart data
+
+    app.get('/mycart/:email',verifyToken,async(req,res)=>{
+      const email=req.params.email;
+      const query={email}
+      const totalBooked=await bookParcelCollections.countDocuments(query);
+
+      
+      const delivered= await bookParcelCollections.aggregate([
+        {
+          $match:{
+            email:email,
+            status:'Delivered'
+          }
+        },
+        {
+          $group:{
+            _id:null,
+            totalPrice:{$sum:'$price'}
+          }
+        }
+      ]).toArray()
+
+      const totalCost=delivered[0]?.totalPrice || 0 
+
+      res.send({totalBooked,totalCost})
+
+
+    })
+
+
+
+    // payment 
+
+    app.post('/create-payment-intent',verifyToken,async(req,res)=>{
+      const {id}=req.body;
+      
+      const query={_id:new ObjectId(id)}
+      const cource=await bookParcelCollections.findOne(query);
+      if(!cource){
+        res.status(400).send({message:'class not found'})
+      }
+
+
+      const price=cource?.price;
+      const totalPrice=price*100;
+
+      const {client_secret} = await stripe.paymentIntents.create({
+        amount: totalPrice,
+        currency: 'usd',
+        automatic_payment_methods: {
+          enabled: true,
+        },
+      });
+
+     
+
+      res.send({clientSecret:client_secret})
+
+    })
+
+
+    // save payment parcel
+
+    app.post('/payment/:id',verifyToken,async(req,res)=>{
+      const id=req.params.id;
+      const data=req.body;
+
+      // update booking payment status
+
+      const query={_id:new ObjectId(id)}
+      const updateDoc={
+        $set:{
+          paymentStatus:"Payed"
+        }
+      }
+      const updateBooking=await bookParcelCollections.updateOne(query,updateDoc);
+
+
+      // save payment 
+      const result=await paymentCollections.insertOne(data);
+      res.send(result)
+
+
+    })
+
+
+
+
+
 
 
 
