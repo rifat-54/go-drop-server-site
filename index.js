@@ -9,7 +9,8 @@ const cookieParser=require('cookie-parser')
 
 const corsOptions={
   origin:['http://localhost:5173',
-  
+  'https://go-drop-eb0ec.web.app',
+  'https://go-drop-eb0ec.firebaseapp.com'
 ],
   credentials:true,
   optionsSuccessStatus: 200
@@ -43,12 +44,13 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
+    // await client.connect();
 
     const db=client.db('GoDrop')
 
     const userCollections=db.collection('users')
     const bookParcelCollections=db.collection('book-parcel')
+    const revewCollections=db.collection('revews')
 
 
 
@@ -323,14 +325,207 @@ async function run() {
       res.send(result)
       
     })
+
+    // get delivery man stauts
+    app.get('/deliveryman-status/:email',verifyToken,async(req,res)=>{
+      const email=req.params.email;
+      const query={email}
+      const result=await userCollections.findOne(query)
+      res.send(result)
+      console.log(result);
+    })
  
 
+    // get my parcel data
+
+    app.get('/my-parcel/:email',verifyToken,async(req,res)=>{
+      const email=req.params.email;
+      const query={email}
+
+      const result=await bookParcelCollections.find(query).toArray()
+      res.send(result)
+    })
+
+
+    // save revew
+    app.post('/revews',verifyToken,async(req,res)=>{
+      const data=req.body;
+      const result=await revewCollections.insertOne(data)
+      res.send(result)
+     
+    })
+
+
+    // get my revew       // verify deliveryman
+
+    app.get('/my-revew/:email',verifyToken,async(req,res)=>{
+      const email=req.params.email;
+      const query={email}
+
+      const isExit=await userCollections.findOne(query);
+
+      if(!isExit){
+        return res.status(401).send('user not found')
+      }
+  
+
+      const id=isExit?._id.toString();
+
+      console.log(email,id);
+
+      const query2={deliverManId:id}
+
+      const result =await revewCollections.find(query2).toArray()
+      console.log('result->>',result);
+      res.send(result)
+
+    })
+
+
+    // update delivery status      // user
+
+    app.patch('/update-delivery-status/:id',verifyToken,async(req,res)=>{
+      const id=req.params.id;
+     
+      const query={_id:new ObjectId(id)}
+      const updateDoc={
+        $set:{
+        status:'Cancelled'
+        }
+      }
+      const result=await bookParcelCollections.updateOne(query,updateDoc);
+   
+      res.send(result);
+
+    })
+
+
+    // get single parcel data
+
+    app.get('/parcel-data/:id',verifyToken,async(req,res)=>{
+      const id=req.params.id;
+      
+      const query={_id:new ObjectId(id)}
+      const result=await bookParcelCollections.findOne(query)
+      res.send(result)
+      console.log(result);
+    })
+
+
+    // update parcel data
+
+    app.patch('/update-parcel/:id',verifyToken,async(req,res)=>{
+      const id=req.params.id;
+      const data=req.body;
+      const query={_id:new ObjectId(id)}
+      const updateDoc={
+        $set:data
+      };
+      const result =await bookParcelCollections.updateOne(query,updateDoc)
+      console.log(result);
+      res.send(result)
+      
+      console.log(id,updateDoc);
+    })
+
+
+
+    // get '/statistics' data
+    // $dateToString: {
+    //   format: "%Y-%m-%d",
+    //   date: { $toDate: "$_id" } // 🔥 Convert ObjectId to Date
+    // }
+
+    app.get('/statistics',verifyToken,async(req,res)=>{
+      const bookVsDate=await bookParcelCollections.aggregate([
+        {
+          $group:{
+            _id:{
+              $dateToString:{
+                format:'%Y-%m-%d',
+                date:{$toDate:'$_id'}
+              }
+            },
+            count:{$sum:1}
+          }
+        },
+        {
+          $sort:{_id:1}
+        }
+      ]).toArray()
+
+      
+      // booked vs deliver
+
+      const bookedVsDeliver=await bookParcelCollections.aggregate([
+        {
+          $group: {
+            _id: {
+              date: {
+                $dateToString: {
+                  format: "%Y-%m-%d",
+                  date: { $toDate: "$_id" }
+                }
+              },
+              status: "$status"
+            },
+            count: { $sum: 1 }
+          }
+        },
+        {
+          $group: {
+            _id: "$_id.date",
+            booked: {
+              $sum: {
+                $cond: [{ $eq: ["$_id.status", "Pending"] }, "$count", 0]
+              }
+            },
+            delivered: {
+              $sum: {
+                $cond: [{ $eq: ["$_id.status", "Delivered"] }, "$count", 0]
+              }
+            }
+          }
+        },
+        { $sort: { _id: -1 } }  
+      ]).toArray()
+
+
+      console.log(bookedVsDeliver);
+
+      const result={
+        bookVsDate,
+        bookedVsDeliver
+      }
+
+      res.send(result)
+
+
+
+
+    })
+
+
+    // get stat
+
+    app.get('/stats',async(req,res)=>{
+      const totalBooked=await bookParcelCollections.countDocuments();
+      const totalDelivered=await bookParcelCollections.countDocuments({status:'Delivered'});
+      const totalUser=await userCollections.countDocuments()
+      const result={
+        totalBooked,totalDelivered,totalUser
+      }
+
+      res.send(result);
+
+      console.log(result);
+    })
 
 
 
 
     // Send a ping to confirm a successful connection
-    await client.db("admin").command({ ping: 1 });
+    // await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
 
   } finally {
