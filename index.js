@@ -17,7 +17,6 @@ const corsOptions={
 }
 
 
-
 const app=express()
 app.use(express.json())
 // app.use(cors())   //comment this for stop Access-Control-Allow-Origin from any here
@@ -430,13 +429,97 @@ async function run() {
     })
 
 
+    // top delivery man
 
-    // get '/statistics' data
-    // $dateToString: {
-    //   format: "%Y-%m-%d",
-    //   date: { $toDate: "$_id" } // 🔥 Convert ObjectId to Date
-    // }
+    app.get('/topdelivery-man',async(req,res)=>{
+      
 
+      const result=await bookParcelCollections.aggregate([
+        {
+          $match:{
+            status:'Delivered'
+          }
+        },
+        {
+          $group:{
+            _id:'$deliveryMan.id',
+            totalDeliver:{$sum:1}
+          }
+        },
+        {
+          $lookup:{
+            from:'users',
+            let:{deliverManId:'$_id'},
+            pipeline:[
+              {
+                $match:{
+                  $expr:{
+                    $eq:['$_id',{$toObjectId:'$$deliverManId'}]
+                  }
+                }
+              }
+            ],
+            as:'userInfo'
+          }
+        },
+        {
+          $unwind:'$userInfo'
+        },
+        {
+          $lookup:{
+            from:'revews',
+            let:{deliverManId:'$_id'},
+            pipeline:[
+              {
+                $match:{
+                  $expr:{
+                    $eq:['$deliverManId','$$deliverManId']
+                  }
+                }
+              },
+              {
+                $group:{
+                  _id:null,
+                  avgRating:{$avg:{$toInt:'$rating'}}
+                }
+              }
+            ],
+            as:'revew'
+          }
+        },
+        {
+          $unwind:{
+            path: '$revew',
+            preserveNullAndEmptyArrays: true
+          }
+          
+        },
+        {
+          $project:{
+            deliverManId:'$_id',
+            totalDeliver:1,
+            name:'$userInfo.name',
+            image:'$userInfo.photo',
+            avgRating:{$round:['$revew.avgRating',1]},
+            _id:0
+          }
+        },
+        {
+          $sort:{avgRating:-1}
+        },
+        {
+          $limit:3
+        }
+        
+      ]).limit(3).toArray()
+
+
+      res.send(result)
+
+    })
+
+    
+// staticstics
     app.get('/statistics',verifyToken,async(req,res)=>{
       const bookVsDate=await bookParcelCollections.aggregate([
         {
