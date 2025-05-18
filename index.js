@@ -123,6 +123,25 @@ async function run() {
     })
 
 
+    // update user 
+
+    app.patch('/user/update/:email',verifyToken,async(req,res)=>{
+      const email=req.params.email;
+      const data=req.body;
+
+    
+      const query={email}
+      const updateDoc={
+        $set:{
+          name:data?.name,
+          photo:data?.image
+        }
+      }
+      const result=await userCollections.updateOne(query,updateDoc)
+      res.send(result)
+    })
+
+
     // get user role
 
     app.get('/user/role/:email',verifyToken,async(req,res)=>{
@@ -422,10 +441,10 @@ async function run() {
         $set:data
       };
       const result =await bookParcelCollections.updateOne(query,updateDoc)
-      // console.log(result);
+    
       res.send(result)
       
-      // console.log(id,updateDoc);
+      
     })
 
 
@@ -433,7 +452,6 @@ async function run() {
 
     app.get('/topdelivery-man',async(req,res)=>{
       
-
       const result=await bookParcelCollections.aggregate([
         {
           $match:{
@@ -511,7 +529,7 @@ async function run() {
           $limit:3
         }
         
-      ]).limit(3).toArray()
+      ]).toArray()
 
 
       res.send(result)
@@ -575,7 +593,7 @@ async function run() {
       ]).toArray()
 
 
-      // console.log(bookedVsDeliver);
+     
 
       const result={
         bookVsDate,
@@ -602,7 +620,7 @@ async function run() {
 
       res.send(result);
 
-      // console.log(result);
+     
     })
 
 
@@ -702,7 +720,7 @@ async function run() {
 
     // Send a ping to confirm a successful connection
     // await client.db("admin").command({ ping: 1 });
-    console.log("Pinged your deployment. You successfully connected to MongoDB!");
+    // console.log("Pinged your deployment. You successfully connected to MongoDB!");
 
   } finally {
     // Ensures that the client will close when you finish/error
