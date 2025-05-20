@@ -241,12 +241,104 @@ async function run() {
     // get all delivery man 
 
     app.get('/all-deliveryman',verifyToken,async(req,res)=>{
-      const query={
-        role:'Delivery Man'
-      }
+      
 
-      const result=await userCollections.find(query).toArray()
+      const result=await userCollections.aggregate([
+        {
+          $match:{
+            role:'Delivery Man',
+           
+          }
+        },
+        {
+          // Convert ObjectId to string
+          $addFields: {
+            stringId: { $toString: '$_id' }
+          }
+        },
+        {
+          $lookup:{
+            from:'book-parcel',
+            localField:'stringId',
+            foreignField:'deliveryMan.id',
+            as:'parcels'
+          }
+        },
+        {
+          $addFields:{
+            deliveredParcels:{
+              $filter:{
+                input:'$parcels',
+                as:'parcel',
+                cond:{$eq:['$$parcel.status','Delivered']}
+              }
+            }
+          }
+        },
+        {
+          $addFields:{
+            totalDelivered:{$size:'$deliveredParcels'}
+          }
+        },
+        {
+          $lookup:{
+            from:'revews',
+            localField:'stringId',
+            foreignField:'deliverManId',
+            as:'reviews'
+          }
+        },
+        {
+          $addFields:{
+            avgRating:{
+              $cond:[
+                {$gt:[{$size:'$reviews'},0]},
+                // {$avg:'$reviews.rating'},
+                { $avg: {
+                  $map: {
+                    input: '$reviews',
+                    as: 'review',
+                    in: { $toDouble: '$$review.rating' } // Just in case it's stored as string
+                  }
+                }
+              },
+                0
+              ]
+            }
+          }
+        },
+        {
+          $project:{
+            name:1,
+            photo:1,
+            phone:1,
+            userStatus:1,
+            totalDelivered:1,
+            avgRating:{$round:['$avgRating',1]}
+          }
+        },
+        {
+          $sort:{
+            totalDelivered:-1,
+            avgRating:-1
+          }
+        }
+
+      ]).toArray()
+
       res.send(result)
+     
+    })
+
+
+    // get user data by id
+
+    app.get('/deliverman/:id',verifyToken,async(req,res)=>{
+      const id=req.params.id;
+      const query={_id:new ObjectId(id)}
+      const result=await userCollections.findOne(query)
+      res.send(result)
+      
     })
 
 
@@ -299,6 +391,13 @@ async function run() {
       
     })
 
+    //top-testimonials
+
+    app.get('/top-testimonials',async(req,res)=>{
+      const result=await revewCollections.find().sort({rating:-1}).limit(10).toArray();
+      res.send(result)
+      
+    })
 
 
     // get my delivery list     // to do devivery man 
